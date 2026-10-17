@@ -4,8 +4,20 @@ import {
   deleteMyQueryHistory,
   fetchMyQueryHistory,
   nlToSqlRequest,
+  QueryRequestError,
 } from "../api";
 import { ResultsVisualizer } from "../components/ResultsVisualizer";
+import { QueryErrorPanel } from "../components/QueryErrorPanel";
+import { QueryRatingSection } from "../components/QueryRatingSection";
+import { Button } from "../components/ui/Button";
+import { Card, CardBody, CardHeader, EmptyState, PageHeader, Skeleton } from "../components/ui/Card";
+import { Label, Textarea } from "../components/ui/Input";
+
+const EXAMPLE_PROMPTS = [
+  "Show the first 10 rows from a table",
+  "Count how many records exist in a table",
+  "List items ordered by date, newest first",
+];
 
 function formatTimestamp(iso) {
   if (!iso) return "";
@@ -21,6 +33,7 @@ function Query() {
   const [text, setText] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [errorDetail, setErrorDetail] = useState(null);
   const [result, setResult] = useState(null);
 
   const [history, setHistory] = useState([]);
@@ -48,25 +61,76 @@ function Query() {
     loadHistory();
   }, [loadHistory]);
 
-  async function runQuery(overrideText) {
+  async function runQuery(overrideText, options = {}) {
     const q = String(overrideText ?? text).trim();
     setError(null);
-    setResult(null);
+    setErrorDetail(null);
+    if (!options.keepResultOnError) {
+      setResult(null);
+    }
     if (!q) {
       setError("Enter a question in natural language.");
+      setErrorDetail({
+        message: "Enter a question in natural language.",
+        assistance: {
+          title: "Missing or invalid question",
+          explanation: "Type what you want to know about the database, then run the query.",
+        },
+      });
       return;
     }
 
     setLoading(true);
     try {
-      const data = await nlToSqlRequest(q);
+      const data = await nlToSqlRequest(q, {
+        rerunSql: options.rerunSql,
+      });
       setResult(data);
+      setSelectedHistoryId(data.queryHistoryId ?? selectedHistoryId);
       await loadHistory();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Something went wrong");
+      if (err instanceof QueryRequestError && err.detail) {
+        setErrorDetail({
+          message: err.message,
+          sql: err.detail.sql,
+          assistance: err.detail.assistance,
+          errorCategory: err.detail.errorCategory,
+        });
+        setError(err.message);
+      } else {
+        setError(err instanceof Error ? err.message : "Something went wrong");
+        setErrorDetail({
+          message: err instanceof Error ? err.message : "Something went wrong",
+          assistance: {
+            title: "Query error",
+            explanation:
+              err instanceof Error ? err.message : "Something went wrong",
+          },
+        });
+      }
     } finally {
       setLoading(false);
     }
+  }
+
+  function handleUseSuggestedQuestion(suggested) {
+    setText(suggested);
+  }
+
+  function handleTextareaKeyDown(e) {
+    if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
+      e.preventDefault();
+      if (!loading && text.trim()) {
+        runQuery();
+      }
+    }
+  }
+
+  function handleRerunCorrectedSql(sql, suggestedNl) {
+    const q = String(suggestedNl || text).trim();
+    if (!q) return;
+    setText(q);
+    runQuery(q, { rerunSql: sql });
   }
 
   function handleSubmit(e) {
@@ -103,73 +167,161 @@ function Query() {
       fromHistory: true,
     });
     setError(null);
+    setErrorDetail(null);
   }
 
   return (
-    <AppShell title="Natural language → SQL">
+    <AppShell>
       <div className="max-w-7xl mx-auto px-4 py-6 md:py-10 md:px-8">
-        <div className="grid grid-cols-1 lg:grid-cols-[minmax(260px,340px)_1fr] gap-6 lg:gap-8 items-start">
-          {/* History sidebar */}
-          <aside className="order-2 lg:order-1 lg:sticky lg:top-4 space-y-3">
-            <div className="rounded-2xl border border-slate-200/90 bg-white shadow-md shadow-slate-200/50 overflow-hidden">
-              <div className="px-4 py-3 border-b border-slate-100 bg-gradient-to-r from-slate-50 to-white flex items-center justify-between gap-2">
-                <div>
-                  <h2 className="text-sm font-semibold text-slate-900 tracking-tight">
-                    Query history
-                  </h2>
-                  <p className="text-xs text-slate-500 mt-0.5">
-                    Saved successful runs
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => loadHistory()}
-                  disabled={historyLoading}
-                  className="text-xs font-medium text-blue-600 hover:text-blue-700 disabled:opacity-50 px-2 py-1 rounded-lg hover:bg-blue-50 transition-colors"
-                >
-                  Refresh
-                </button>
+        <PageHeader
+          title="Explore your database"
+          description="Ask questions in plain language. Get validated SQL, understandable explanations, and visual insights."
+        />
+
+        <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,2fr)_minmax(260px,1fr)] gap-6 lg:gap-8 items-start">
+          <div className="space-y-6 min-w-0">
+            <Card>
+              <CardBody>
+                <form onSubmit={handleSubmit} className="space-y-4">
+                  <div>
+                    <Label htmlFor="nl-query">Ask a question</Label>
+                    <Textarea
+                      id="nl-query"
+                      className="mt-1.5 min-h-[140px]"
+                      placeholder='e.g. "Show all users who signed up this month"'
+                      value={text}
+                      onChange={(e) => setText(e.target.value)}
+                      onKeyDown={handleTextareaKeyDown}
+                      disabled={loading}
+                    />
+                    <p className="mt-1.5 text-xs text-slate-500">
+                      Press <kbd className="rounded border border-slate-200 bg-slate-50 px-1 font-mono text-[10px]">Ctrl</kbd>
+                      +<kbd className="rounded border border-slate-200 bg-slate-50 px-1 font-mono text-[10px]">Enter</kbd> to run
+                    </p>
+                  </div>
+
+                  <div className="flex flex-wrap gap-2">
+                    {EXAMPLE_PROMPTS.map((prompt) => (
+                      <button
+                        key={prompt}
+                        type="button"
+                        disabled={loading}
+                        onClick={() => setText(prompt)}
+                        className="text-xs rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-slate-700 hover:border-indigo-200 hover:bg-indigo-50 hover:text-indigo-800 transition-colors disabled:opacity-50"
+                      >
+                        {prompt}
+                      </button>
+                    ))}
+                  </div>
+
+                  <Button type="submit" loading={loading} disabled={loading || !text.trim()} className="gap-2">
+                    <svg viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4" aria-hidden>
+                      <path d="M4.5 5.653A1.75 1.75 0 016.28 4h7.44a1.75 1.75 0 011.53 2.653l-2.482 4.006H14a1.75 1.75 0 010 3.5H5.5a1.75 1.75 0 01-1.53-2.653l2.482-4.006H4.5A1.75 1.75 0 014.5 5.653z" />
+                    </svg>
+                    Run query
+                  </Button>
+                </form>
+              </CardBody>
+            </Card>
+
+            {errorDetail ? (
+              <QueryErrorPanel
+                errorDetail={errorDetail}
+                loadingAssistance={loading && !errorDetail.assistance}
+                onUseSuggestedQuestion={handleUseSuggestedQuestion}
+                onRerunCorrectedSql={handleRerunCorrectedSql}
+                rerunLoading={loading}
+              />
+            ) : error ? (
+              <p className="text-red-600 text-sm" role="alert">
+                {error}
+              </p>
+            ) : null}
+
+            {result && (
+              <div className="space-y-5">
+                {result.fromHistory ? (
+                  <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+                    {result.message}
+                  </div>
+                ) : null}
+
+                <Card>
+                  <CardHeader>
+                    <h3 className="text-sm font-semibold text-slate-900">Generated SQL</h3>
+                  </CardHeader>
+                  <CardBody className="pt-0">
+                    <pre className="text-sm bg-slate-900 text-slate-100 p-4 rounded-lg overflow-x-auto whitespace-pre-wrap font-mono leading-relaxed">
+                      {result.sql}
+                    </pre>
+                  </CardBody>
+                </Card>
+
+                {result.explanation != null && result.explanation !== "" && (
+                  <Card>
+                    <CardHeader>
+                      <h3 className="text-sm font-semibold text-slate-900">Explanation</h3>
+                    </CardHeader>
+                    <CardBody className="pt-0">
+                      <p className="text-slate-700 text-sm whitespace-pre-wrap leading-relaxed">
+                        {result.explanation}
+                      </p>
+                    </CardBody>
+                  </Card>
+                )}
+
+                {result.results != null && !result.fromHistory ? (
+                  <QueryRatingSection queryHistoryId={result.queryHistoryId} />
+                ) : null}
+
+                {result.results != null ? (
+                  <ResultsVisualizer
+                    key={String(result.sql ?? "")}
+                    results={result.results}
+                    resultMeta={result.resultMeta}
+                  />
+                ) : (
+                  <Card>
+                    <CardHeader>
+                      <h3 className="text-sm font-semibold text-slate-900">Results</h3>
+                    </CardHeader>
+                    <CardBody className="pt-0">
+                      <p className="text-sm text-slate-500">
+                        Run the query to fetch fresh rows from the database.
+                      </p>
+                    </CardBody>
+                  </Card>
+                )}
               </div>
+            )}
+          </div>
+
+          <aside className="lg:sticky lg:top-[4.5rem] space-y-3">
+            <Card className="overflow-hidden">
+              <CardHeader className="flex flex-row items-center justify-between gap-2 bg-slate-50/50">
+                <div>
+                  <h2 className="text-sm font-semibold text-slate-900">Query history</h2>
+                  <p className="text-xs text-slate-500 mt-0.5">Saved successful runs</p>
+                </div>
+                <Button variant="ghost" size="sm" onClick={() => loadHistory()} disabled={historyLoading}>
+                  Refresh
+                </Button>
+              </CardHeader>
 
               <div className="max-h-[min(520px,calc(100vh-12rem))] overflow-y-auto p-3 space-y-2">
                 {historyLoading && history.length === 0 ? (
-                  <div className="space-y-2 animate-pulse">
+                  <div className="space-y-2">
                     {[1, 2, 3].map((k) => (
-                      <div
-                        key={k}
-                        className="h-20 rounded-xl bg-slate-100"
-                      />
+                      <Skeleton key={k} className="h-20" />
                     ))}
                   </div>
                 ) : null}
 
                 {!historyLoading && history.length === 0 ? (
-                  <div className="text-center py-10 px-4">
-                    <div className="mx-auto w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center mb-3">
-                      <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        strokeWidth={1.5}
-                        stroke="currentColor"
-                        className="w-6 h-6 text-slate-400"
-                        aria-hidden
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z"
-                        />
-                      </svg>
-                    </div>
-                    <p className="text-sm font-medium text-slate-700">
-                      No history yet
-                    </p>
-                    <p className="text-xs text-slate-500 mt-1 leading-relaxed">
-                      Run a successful query and it will appear here for quick
-                      reuse.
-                    </p>
-                  </div>
+                  <EmptyState
+                    title="No history yet"
+                    description="Run a successful query and it will appear here for quick reuse."
+                  />
                 ) : null}
 
                 {history.map((item) => {
@@ -186,10 +338,10 @@ function Query() {
                           applyHistoryItem(item);
                         }
                       }}
-                      className={`group relative rounded-xl border px-3 py-3 text-left cursor-pointer transition-all outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 ${
+                      className={`group relative rounded-lg border px-3 py-3 text-left cursor-pointer transition-all outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 ${
                         active
-                          ? "border-blue-300 bg-blue-50/80 shadow-sm"
-                          : "border-slate-200 bg-white hover:border-slate-300 hover:shadow-md hover:shadow-slate-200/60"
+                          ? "border-indigo-300 bg-indigo-50/80 shadow-sm"
+                          : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50/80"
                       }`}
                     >
                       <p className="text-sm text-slate-800 line-clamp-2 leading-snug pr-16">
@@ -261,112 +413,8 @@ function Query() {
                   {historyError}
                 </p>
               ) : null}
-            </div>
+            </Card>
           </aside>
-
-          {/* Main workspace */}
-          <div className="order-1 lg:order-2 space-y-6 min-w-0">
-            <form
-              onSubmit={handleSubmit}
-              className="rounded-2xl border border-slate-200/90 bg-white shadow-md shadow-slate-200/40 p-6 md:p-8 space-y-5"
-            >
-              <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
-                <div>
-                  <h2 className="text-base font-semibold text-slate-900">
-                    Ask your database
-                  </h2>
-                  <p className="text-sm text-slate-500 mt-1">
-                    Natural language is translated to read-only{" "}
-                    <code className="text-xs bg-slate-100 px-1.5 py-0.5 rounded">
-                      SELECT
-                    </code>{" "}
-                    SQL.
-                  </p>
-                </div>
-              </div>
-
-              <label className="block text-sm font-medium text-slate-700">
-                Your question
-                <textarea
-                  className="mt-2 w-full min-h-[140px] p-3 rounded-xl border border-slate-200 bg-slate-50/50 text-slate-900 placeholder:text-slate-400 focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 outline-none transition-shadow disabled:opacity-60"
-                  placeholder='e.g. "Show all users ordered by signup date"'
-                  value={text}
-                  onChange={(e) => setText(e.target.value)}
-                  disabled={loading}
-                />
-              </label>
-
-              <div className="flex flex-wrap gap-3">
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className="inline-flex items-center justify-center px-6 py-2.5 rounded-xl bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 shadow-sm shadow-blue-600/20 disabled:opacity-60 transition-colors"
-                >
-                  {loading ? (
-                    <span className="inline-flex items-center gap-2">
-                      <span className="inline-block h-4 w-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
-                      Running…
-                    </span>
-                  ) : (
-                    "Run query"
-                  )}
-                </button>
-              </div>
-
-              {error && (
-                <p className="text-red-600 text-sm" role="alert">
-                  {error}
-                </p>
-              )}
-            </form>
-
-            {result && (
-              <div className="space-y-5">
-                {result.fromHistory ? (
-                  <div className="rounded-xl border border-amber-200 bg-amber-50/80 px-4 py-3 text-sm text-amber-900">
-                    {result.message}
-                  </div>
-                ) : null}
-
-                <section className="rounded-2xl border border-slate-200/90 bg-white shadow-md shadow-slate-200/40 p-6 md:p-8">
-                  <h3 className="text-sm font-semibold text-slate-900 mb-3">
-                    Generated SQL
-                  </h3>
-                  <pre className="text-sm bg-slate-950 text-slate-100 p-4 rounded-xl overflow-x-auto whitespace-pre-wrap font-mono leading-relaxed">
-                    {result.sql}
-                  </pre>
-                </section>
-
-                {result.explanation != null && result.explanation !== "" && (
-                  <section className="rounded-2xl border border-slate-200/90 bg-white shadow-md shadow-slate-200/40 p-6 md:p-8">
-                    <h3 className="text-sm font-semibold text-slate-900 mb-3">
-                      Explanation
-                    </h3>
-                    <p className="text-slate-700 text-sm whitespace-pre-wrap leading-relaxed">
-                      {result.explanation}
-                    </p>
-                  </section>
-                )}
-
-                {result.results != null ? (
-                  <ResultsVisualizer
-                    key={String(result.sql ?? "")}
-                    results={result.results}
-                    resultMeta={result.resultMeta}
-                  />
-                ) : (
-                  <section className="rounded-2xl border border-slate-200/90 bg-white shadow-md shadow-slate-200/40 p-6 md:p-8">
-                    <h3 className="text-sm font-semibold text-slate-900 mb-3">
-                      Results
-                    </h3>
-                    <p className="text-sm text-slate-500">
-                      Run the query to fetch fresh rows from the database.
-                    </p>
-                  </section>
-                )}
-              </div>
-            )}
-          </div>
         </div>
       </div>
     </AppShell>

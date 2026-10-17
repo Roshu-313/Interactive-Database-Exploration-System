@@ -7,12 +7,14 @@ const router = express.Router();
 const healthRoutes = require('./healthRoutes');
 const authRoutes = require('./authRoutes');
 const queryRoutes = require('./queryRoutes');
+const queryRatingRoutes = require('./queryRatingRoutes');
 const schemaRoutes = require('./schemaRoutes');
 
 // Mount health routes at /api/health -> GET /api/health, GET /api/health/db-status
 router.use('/health', healthRoutes);
 router.use('/auth', authRoutes);
 router.use('/query', queryRoutes);
+router.use('/query-ratings', queryRatingRoutes);
 router.use('/schema', schemaRoutes);
 
 module.exports = router;

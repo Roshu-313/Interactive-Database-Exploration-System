@@ -143,6 +143,7 @@ async function getForeignKeyRelationships() {
 
 module.exports = {
   isValidTableIdentifier,
+  listTableNames,
   getTables,
   getTableDetails,
   getForeignKeyRelationships,

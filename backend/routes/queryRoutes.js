@@ -1,91 +1,63 @@
 const express = require('express');
 const router = express.Router();
-const { QueryTypes } = require('sequelize');
 
 const authMiddleware = require('../middleware/authMiddleware');
-const llmToSql = require('../utils/llmToSql');
-const llmExplain = require('../utils/llmExplain');
-const nlToSql = require('../utils/nlToSql');
-const explainSQL = require('../utils/sqlExplain');
+const { QueryHistory } = require('../models');
 const {
-  serializeResults,
-  buildVisualizationMeta,
-} = require('../utils/queryResultVisualization');
-const { sequelize, QueryHistory } = require('../models');
+  runNaturalLanguageQuery,
+  sendQueryError,
+} = require('../services/queryPipeline');
 
 router.post('/nl-to-sql', authMiddleware, async (req, res) => {
   try {
-    const { query } = req.body;
+    const { query, rerunSql } = req.body;
 
     if (query == null || String(query).trim() === '') {
-      return res.status(400).json({
+      return sendQueryError(res, 400, {
+        category: 'INVALID_INPUT',
         message: 'Query is required',
+        naturalLanguageQuery: '',
+        generatedSql: null,
       });
     }
 
-    // 🔹 Step 1: Convert NL → SQL (LLM first)
-    let sqlQuery = await llmToSql(query);
-
-    // 🔹 Step 2: Fallback to rule-based if LLM fails
-    if (!sqlQuery) {
-      sqlQuery = nlToSql(query);
-    }
-
-    if (!sqlQuery) {
-      return res.status(400).json({
-        message: 'Query not understood',
-      });
-    }
-
-    // 🔹 Step 3: Safety check (ONLY SELECT allowed)
-    if (!sqlQuery.toLowerCase().startsWith('select')) {
-      return res.status(403).json({
-        message: 'Only SELECT queries are allowed',
-      });
-    }
-
-    // 🔹 Step 4: Execute SQL
-    const rawRows = await sequelize.query(sqlQuery, {
-      type: QueryTypes.SELECT,
+    const outcome = await runNaturalLanguageQuery({
+      userId: req.user.id,
+      query: String(query),
+      rerunSql: rerunSql != null ? String(rerunSql) : null,
     });
 
-    const results = serializeResults(rawRows);
-    const resultMeta = buildVisualizationMeta(results);
+    if (!outcome.ok) {
+      let status = 400;
+      if (outcome.category === 'SECURITY_VIOLATION') status = 403;
+      else if (outcome.category === 'DATABASE_ERROR') status = 503;
+      else if (outcome.category === 'INTERNAL_ERROR') status = 500;
 
-    // 🔹 Step 5: Generate explanation (LLM first)
-    let explanation = await llmExplain(sqlQuery);
-
-    // 🔹 Step 6: Fallback explanation
-    if (!explanation || explanation.includes('not available')) {
-      explanation = explainSQL(sqlQuery);
-    }
-
-    // 🔹 Persist successful run for query history (non-blocking)
-    try {
-      await QueryHistory.create({
-        userId: req.user.id,
-        naturalLanguageQuery: String(query),
-        generatedSql: sqlQuery,
-        explanation: explanation || '',
+      return sendQueryError(res, status, {
+        category: outcome.category,
+        message: outcome.message,
+        naturalLanguageQuery: outcome.naturalLanguageQuery,
+        generatedSql: outcome.generatedSql,
       });
-    } catch (histErr) {
-      console.error('QueryHistory save failed:', histErr.message);
     }
 
-    // 🔹 Step 7: Send response (results + resultMeta; legacy clients ignore resultMeta)
-    res.json({
+    return res.json({
+      status: 'ok',
       message: 'Query executed successfully',
-      input: query,
-      sql: sqlQuery,
-      results,
-      explanation,
-      resultMeta,
+      input: outcome.naturalLanguageQuery,
+      sql: outcome.sql,
+      results: outcome.results,
+      explanation: outcome.explanation,
+      resultMeta: outcome.resultMeta,
+      queryHistoryId: outcome.queryHistoryId,
     });
-
   } catch (error) {
-    res.status(500).json({
+    console.error('nl-to-sql unexpected error:', error.message);
+    return sendQueryError(res, 500, {
+      category: 'INTERNAL_ERROR',
       message: 'Error executing query',
-      error: error.message,
+      naturalLanguageQuery: String(req.body?.query || ''),
+      generatedSql: null,
     });
   }
 });
@@ -112,7 +84,6 @@ router.get('/history', authMiddleware, async (req, res) => {
     return res.status(500).json({
       status: 'error',
       message: 'Failed to load query history',
-      error: err.message,
     });
   }
 });
@@ -149,7 +120,6 @@ router.delete('/history/:id', authMiddleware, async (req, res) => {
     return res.status(500).json({
       status: 'error',
       message: 'Failed to delete history item',
-      error: err.message,
     });
   }
 });

@@ -1,7 +1,12 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { useAuth } from "../context/AuthContext";
+import { AuthLayout, AuthLoadingScreen } from "../components/auth/AuthLayout";
+import { PasswordField } from "../components/auth/PasswordField";
 import { resetPasswordRequest } from "../api";
+import { Alert } from "../components/ui/Card";
+import { Button } from "../components/ui/Button";
+import { FieldError, FieldHint } from "../components/ui/Input";
+import { useAuth } from "../context/AuthContext";
 
 function ResetPassword() {
   const navigate = useNavigate();
@@ -60,82 +65,76 @@ function ResetPassword() {
   }
 
   if (authLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-100">
-        Loading…
-      </div>
-    );
+    return <AuthLoadingScreen />;
   }
 
   return (
-    <div className="flex items-center justify-center min-h-screen bg-gray-100 p-4">
-      <form
-        onSubmit={handleSubmit}
-        className="bg-white p-8 rounded-2xl shadow-md w-full max-w-md"
-      >
-        <h2 className="text-2xl font-bold mb-2 text-center">Reset password</h2>
-        <p className="text-sm text-gray-600 text-center mb-6">
-          Choose a new password for your account.
+    <AuthLayout
+      heading="Choose a new password"
+      subheading="Enter a strong password for your IDES account."
+      footer={
+        <p className="text-center text-sm text-slate-600">
+          <Link to="/forgot-password" className="font-medium text-indigo-600 hover:text-indigo-700">
+            Request a new reset link
+          </Link>
+          {" · "}
+          <Link to="/login" className="font-medium text-indigo-600 hover:text-indigo-700">
+            Sign in
+          </Link>
         </p>
+      }
+    >
+      {success ? (
+        <Alert variant="success" title="Password reset successful">
+          Redirecting to sign in…{" "}
+          <Link to="/login" className="font-medium underline">
+            Continue now
+          </Link>
+        </Alert>
+      ) : (
+        <form onSubmit={handleSubmit} className="space-y-4">
+          {!token ? (
+            <Alert variant="error" title="Invalid link">
+              This reset link is missing or expired. Request a new one from the forgot password page.
+            </Alert>
+          ) : null}
 
-        {success ? (
-          <div className="space-y-4 text-center">
-            <p className="text-green-700 text-sm" role="status">
-              Password reset successful. Redirecting to login…
-            </p>
-            <Link to="/login" className="text-blue-600 hover:underline text-sm">
-              Go to login now
-            </Link>
-          </div>
-        ) : (
-          <>
-            <input
-              type="password"
-              placeholder="New password (min 6 characters)"
-              required
-              minLength={6}
-              className="w-full p-2 mb-4 border rounded"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-            />
+          <PasswordField
+            id="reset-password"
+            label="New password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            autoComplete="new-password"
+            required
+            minLength={6}
+            placeholder="At least 6 characters"
+          />
+          <FieldHint>Minimum 6 characters.</FieldHint>
 
-            <input
-              type="password"
-              placeholder="Confirm new password"
-              required
-              minLength={6}
-              className="w-full p-2 mb-4 border rounded"
-              value={confirm}
-              onChange={(e) => setConfirm(e.target.value)}
-            />
+          <PasswordField
+            id="reset-confirm"
+            label="Confirm new password"
+            value={confirm}
+            onChange={(e) => setConfirm(e.target.value)}
+            autoComplete="new-password"
+            required
+            minLength={6}
+          />
 
-            {error && (
-              <p className="text-red-600 text-sm mb-3" role="alert">
-                {error}
-              </p>
-            )}
+          <FieldError>{error}</FieldError>
 
-            <button
-              type="submit"
-              disabled={loading || !token}
-              className="w-full bg-blue-500 text-white py-2 rounded hover:bg-blue-600 disabled:opacity-60"
-            >
-              {loading ? "Updating…" : "Reset password"}
-            </button>
-
-            <p className="mt-4 text-center text-sm text-gray-600">
-              <Link to="/forgot-password" className="text-blue-600 hover:underline">
-                Request a new reset link
-              </Link>
-              {" · "}
-              <Link to="/login" className="text-blue-600 hover:underline">
-                Back to login
-              </Link>
-            </p>
-          </>
-        )}
-      </form>
-    </div>
+          <Button
+            type="submit"
+            className="w-full"
+            size="lg"
+            loading={loading}
+            disabled={loading || !token}
+          >
+            Update password
+          </Button>
+        </form>
+      )}
+    </AuthLayout>
   );
 }
 

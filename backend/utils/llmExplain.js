@@ -8,6 +8,8 @@ You are a SQL teacher.
 Explain the following SQL query to a beginner student in a clear and structured way.
 
 Instructions:
+- Return your answer ONLY in Markdown.
+- Use proper Markdown headings (##), bullet points, and bold text.
 - First, give a short "Purpose" of the query.
 - Then explain ONLY the SQL clauses that are actually present in the query.
 - Possible clauses include: SELECT, FROM, WHERE, GROUP BY, ORDER BY, LIMIT.

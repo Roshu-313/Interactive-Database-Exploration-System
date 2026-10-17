@@ -1,7 +1,11 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { useAuth } from "../context/AuthContext";
+import { AuthLayout, AuthLoadingScreen } from "../components/auth/AuthLayout";
 import { forgotPasswordRequest } from "../api";
+import { Alert } from "../components/ui/Card";
+import { Button } from "../components/ui/Button";
+import { FieldError, Input, Label } from "../components/ui/Input";
+import { useAuth } from "../context/AuthContext";
 
 function ForgotPassword() {
   const navigate = useNavigate();
@@ -37,81 +41,70 @@ function ForgotPassword() {
   }
 
   if (authLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-100">
-        Loading…
-      </div>
-    );
+    return <AuthLoadingScreen />;
   }
 
   return (
-    <div className="flex items-center justify-center min-h-screen bg-gray-100 p-4">
-      <div className="bg-white p-8 rounded-2xl shadow-md w-full max-w-md">
-        <h2 className="text-2xl font-bold mb-2 text-center">Forgot password</h2>
-        <p className="text-sm text-gray-600 text-center mb-6">
-          Enter your email and we&apos;ll send you a link to reset your password.
+    <AuthLayout
+      heading="Reset your password"
+      subheading="Enter the email associated with your account. If it exists, we'll send recovery instructions."
+      footer={
+        <p className="text-center text-sm text-slate-600">
+          Remember your password?{" "}
+          <Link to="/login" className="font-medium text-indigo-600 hover:text-indigo-700">
+            Back to sign in
+          </Link>
         </p>
-
-        {success ? (
-          <div className="space-y-4">
-            <p className="text-green-700 text-sm text-center" role="status">
-              If an account exists for that email, you will receive password reset
-              instructions shortly.
-            </p>
-            {devResetUrl && (
-              <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm">
-                <p className="font-medium text-amber-900 mb-1">Development reset link</p>
-                <p className="text-amber-800 break-all mb-2">{devResetUrl}</p>
-                <Link
-                  to={new URL(devResetUrl).pathname}
-                  className="text-blue-600 hover:underline"
-                >
-                  Open reset page
-                </Link>
-              </div>
-            )}
-            <Link
-              to="/login"
-              className="block w-full text-center bg-blue-500 text-white py-2 rounded hover:bg-blue-600"
-            >
-              Back to login
-            </Link>
-          </div>
-        ) : (
-          <form onSubmit={handleSubmit}>
-            <input
+      }
+    >
+      {success ? (
+        <div className="space-y-4">
+          <Alert variant="success">
+            If an account exists for that email, you will receive password reset instructions
+            shortly.
+          </Alert>
+          {devResetUrl ? (
+            <Alert variant="warning" title="Development reset link">
+              <p className="break-all text-xs mt-1">{devResetUrl}</p>
+              <Link
+                to={new URL(devResetUrl).pathname}
+                className="inline-block mt-2 text-sm font-medium text-indigo-700 hover:underline"
+              >
+                Open reset page
+              </Link>
+            </Alert>
+          ) : null}
+          <Link
+            to="/login"
+            className="flex h-11 w-full items-center justify-center rounded-lg border border-slate-200 bg-white text-sm font-medium text-slate-800 hover:bg-slate-50 transition-colors"
+          >
+            Back to sign in
+          </Link>
+        </div>
+      ) : (
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <Label htmlFor="forgot-email">Email</Label>
+            <Input
+              id="forgot-email"
               type="email"
-              placeholder="Email"
+              autoComplete="email"
               required
-              className="w-full p-2 mb-4 border rounded"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
+              className="mt-1.5"
+              placeholder="you@company.com"
             />
+          </div>
 
-            {error && (
-              <p className="text-red-600 text-sm mb-3" role="alert">
-                {error}
-              </p>
-            )}
+          <FieldError>{error}</FieldError>
 
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full bg-blue-500 text-white py-2 rounded hover:bg-blue-600 disabled:opacity-60"
-            >
-              {loading ? "Sending…" : "Send reset link"}
-            </button>
-
-            <p className="mt-4 text-center text-sm text-gray-600">
-              Remember your password?{" "}
-              <Link to="/login" className="text-blue-600 hover:underline">
-                Log in
-              </Link>
-            </p>
-          </form>
-        )}
-      </div>
-    </div>
+          <Button type="submit" className="w-full" size="lg" loading={loading} disabled={loading}>
+            Send reset link
+          </Button>
+        </form>
+      )}
+    </AuthLayout>
   );
 }
 

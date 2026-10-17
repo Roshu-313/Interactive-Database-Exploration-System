@@ -1,5 +1,9 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { AuthLayout, AuthLoadingScreen } from "../components/auth/AuthLayout";
+import { PasswordField } from "../components/auth/PasswordField";
+import { Button } from "../components/ui/Button";
+import { FieldError, FieldHint, Input, Label } from "../components/ui/Input";
 import { useAuth } from "../context/AuthContext";
 
 function Signup() {
@@ -45,79 +49,80 @@ function Signup() {
   }
 
   if (authLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-100">
-        Loading…
-      </div>
-    );
+    return <AuthLoadingScreen />;
   }
 
   return (
-    <div className="flex items-center justify-center min-h-screen bg-gray-100 p-4">
-      <form
-        onSubmit={handleSubmit}
-        className="bg-white p-8 rounded-2xl shadow-md w-full max-w-md"
-      >
-        <h2 className="text-2xl font-bold mb-6 text-center">Create account</h2>
-
-        <input
-          type="text"
-          placeholder="Name"
-          required
-          className="w-full p-2 mb-4 border rounded"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-        />
-
-        <input
-          type="email"
-          placeholder="Email"
-          required
-          className="w-full p-2 mb-4 border rounded"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-        />
-
-        <input
-          type="password"
-          placeholder="Password (min 6 characters)"
-          required
-          className="w-full p-2 mb-4 border rounded"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-        />
-
-        <input
-          type="password"
-          placeholder="Confirm password"
-          required
-          className="w-full p-2 mb-4 border rounded"
-          value={confirm}
-          onChange={(e) => setConfirm(e.target.value)}
-        />
-
-        {error && (
-          <p className="text-red-600 text-sm mb-3" role="alert">
-            {error}
-          </p>
-        )}
-
-        <button
-          type="submit"
-          disabled={loading}
-          className="w-full bg-blue-500 text-white py-2 rounded hover:bg-blue-600 disabled:opacity-60"
-        >
-          {loading ? "Creating account…" : "Sign up"}
-        </button>
-
-        <p className="mt-4 text-center text-sm text-gray-600">
+    <AuthLayout
+      heading="Create your account"
+      subheading="Join IDES to ask questions in plain language and explore your schema with confidence."
+      footer={
+        <p className="text-center text-sm text-slate-600">
           Already have an account?{" "}
-          <Link to="/login" className="text-blue-600 hover:underline">
-            Log in
+          <Link to="/login" className="font-medium text-indigo-600 hover:text-indigo-700">
+            Sign in
           </Link>
         </p>
+      }
+    >
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div>
+          <Label htmlFor="signup-name">Name</Label>
+          <Input
+            id="signup-name"
+            type="text"
+            autoComplete="name"
+            required
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            className="mt-1.5"
+            placeholder="Your name"
+          />
+        </div>
+
+        <div>
+          <Label htmlFor="signup-email">Email</Label>
+          <Input
+            id="signup-email"
+            type="email"
+            autoComplete="email"
+            required
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            className="mt-1.5"
+            placeholder="you@company.com"
+          />
+        </div>
+
+        <PasswordField
+          id="signup-password"
+          label="Password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          autoComplete="new-password"
+          required
+          minLength={6}
+          placeholder="At least 6 characters"
+        />
+        <FieldHint>Minimum 6 characters.</FieldHint>
+
+        <PasswordField
+          id="signup-confirm"
+          label="Confirm password"
+          value={confirm}
+          onChange={(e) => setConfirm(e.target.value)}
+          autoComplete="new-password"
+          required
+          minLength={6}
+        />
+
+        <FieldError>{error}</FieldError>
+
+        <Button type="submit" className="w-full" size="lg" loading={loading} disabled={loading}>
+          Create account
+        </Button>
       </form>
-    </div>
+    </AuthLayout>
   );
 }
 

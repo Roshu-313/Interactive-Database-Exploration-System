@@ -131,15 +131,26 @@ export async function adminDashboardRequest() {
   return data;
 }
 
-export async function nlToSqlRequest(naturalLanguage) {
+export class QueryRequestError extends Error {
+  constructor(message, detail = null) {
+    super(message);
+    this.name = "QueryRequestError";
+    this.detail = detail;
+  }
+}
+
+export async function nlToSqlRequest(naturalLanguage, options = {}) {
   if (!getToken()) {
     throw new Error("Not logged in. Log in on the home page first.");
   }
 
+  const body = { query: naturalLanguage };
+  if (options.rerunSql) {
+    body.rerunSql = options.rerunSql;
+  }
+
   try {
-    const { data } = await axiosApi.post("/query/nl-to-sql", {
-      query: naturalLanguage,
-    });
+    const { data } = await axiosApi.post("/query/nl-to-sql", body);
     return data;
   } catch (err) {
     const status = err.response?.status;
@@ -153,8 +164,82 @@ export async function nlToSqlRequest(naturalLanguage) {
     if (status === 401) {
       throw new Error("Session expired. Please log in again.");
     }
+    if (payload && typeof payload === "object" && payload.status === "error") {
+      throw new QueryRequestError(
+        typeof msg === "string" ? msg : "Query failed",
+        payload,
+      );
+    }
     throw new Error(typeof msg === "string" ? msg : JSON.stringify(msg));
   }
+}
+
+export async function submitQueryRating({ queryHistoryId, rating, feedback }) {
+  try {
+    const { data } = await axiosApi.post("/query-ratings", {
+      queryHistoryId,
+      rating,
+      feedback,
+    });
+    return data.rating;
+  } catch (err) {
+    throw new Error(axiosErrorMessage(err, "Failed to submit rating"));
+  }
+}
+
+export async function fetchRatingForQuery(queryHistoryId) {
+  const { data } = await axiosApi.get(
+    `/query-ratings/query/${encodeURIComponent(String(queryHistoryId))}`,
+  );
+  return data.rating;
+}
+
+export async function updateQueryRating(id, { rating, feedback }) {
+  try {
+    const { data } = await axiosApi.put(`/query-ratings/${id}`, {
+      rating,
+      feedback,
+    });
+    return data.rating;
+  } catch (err) {
+    throw new Error(axiosErrorMessage(err, "Failed to update rating"));
+  }
+}
+
+export async function adminFetchUsers({ search = "", limit = 15, offset = 0 } = {}) {
+  const params = new URLSearchParams({ limit: String(limit), offset: String(offset) });
+  if (search) params.set("search", search);
+  const { data } = await axiosApi.get(`/admin/users?${params}`);
+  return data;
+}
+
+export async function adminUpdateUserRole(userId, role) {
+  const { data } = await axiosApi.patch(`/admin/users/${userId}/role`, { role });
+  return data.user;
+}
+
+export async function adminFetchUserActivity(userId, { limit = 10, offset = 0 } = {}) {
+  const params = new URLSearchParams({ limit: String(limit), offset: String(offset) });
+  const { data } = await axiosApi.get(`/admin/users/${userId}/activity?${params}`);
+  return data;
+}
+
+export async function adminFetchQueryHistory({ search = "", limit = 20, offset = 0 } = {}) {
+  const params = new URLSearchParams({ limit: String(limit), offset: String(offset) });
+  if (search) params.set("search", search);
+  const { data } = await axiosApi.get(`/admin/query-history?${params}`);
+  return data;
+}
+
+export async function adminFetchRatings({ limit = 15, offset = 0 } = {}) {
+  const params = new URLSearchParams({ limit: String(limit), offset: String(offset) });
+  const { data } = await axiosApi.get(`/admin/ratings?${params}`);
+  return data;
+}
+
+export async function adminFetchRatingStats() {
+  const { data } = await axiosApi.get("/admin/ratings/stats");
+  return data.stats;
 }
 
 /**

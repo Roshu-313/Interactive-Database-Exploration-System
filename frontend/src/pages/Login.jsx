@@ -1,5 +1,10 @@
 import { useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
+import { AuthLayout, AuthLoadingScreen } from "../components/auth/AuthLayout";
+import { PasswordField } from "../components/auth/PasswordField";
+import { Alert } from "../components/ui/Card";
+import { Button } from "../components/ui/Button";
+import { FieldError, Input, Label } from "../components/ui/Input";
 import { useAuth } from "../context/AuthContext";
 
 function Login() {
@@ -36,79 +41,71 @@ function Login() {
   }
 
   if (authLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-100">
-        Loading…
-      </div>
-    );
+    return <AuthLoadingScreen />;
   }
 
   return (
-    <div className="flex items-center justify-center min-h-screen bg-gray-100 p-4">
-      <form
-        onSubmit={handleSubmit}
-        className="bg-white p-8 rounded-2xl shadow-md w-full max-w-md"
-      >
-        <h2 className="text-2xl font-bold mb-6 text-center">Login</h2>
+    <AuthLayout
+      heading="Welcome back"
+      subheading="Sign in to explore your database with natural language queries and explainable SQL."
+      footer={
+        <p className="text-center text-sm text-slate-600">
+          No account?{" "}
+          <Link to="/signup" className="font-medium text-indigo-600 hover:text-indigo-700">
+            Create one
+          </Link>
+        </p>
+      }
+    >
+      {registered ? (
+        <Alert variant="success" title="Account created">
+          You can sign in with your new credentials.
+        </Alert>
+      ) : null}
 
-        {registered && (
-          <p className="text-green-700 text-sm mb-4 text-center">
-            Account created. You can log in now.
-          </p>
-        )}
+      {passwordReset ? (
+        <Alert variant="success" title="Password updated" className={registered ? "mt-3" : ""}>
+          Sign in with your new password.
+        </Alert>
+      ) : null}
 
-        {passwordReset && (
-          <p className="text-green-700 text-sm mb-4 text-center">
-            Password updated. You can log in with your new password.
-          </p>
-        )}
+      <form onSubmit={handleSubmit} className="space-y-4 mt-6">
+        <div>
+          <Label htmlFor="login-email">Email</Label>
+          <Input
+            id="login-email"
+            type="email"
+            autoComplete="email"
+            required
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            className="mt-1.5"
+            placeholder="you@company.com"
+          />
+        </div>
 
-        <input
-          type="email"
-          placeholder="Email"
-          required
-          className="w-full p-2 mb-4 border rounded"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-        />
-
-        <input
-          type="password"
-          placeholder="Password"
-          required
-          className="w-full p-2 mb-2 border rounded"
+        <PasswordField
+          id="login-password"
+          label="Password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
+          autoComplete="current-password"
+          required
         />
 
-        <p className="text-right text-sm mb-4">
-          <Link to="/forgot-password" className="text-blue-600 hover:underline">
+        <p className="text-right text-sm">
+          <Link to="/forgot-password" className="font-medium text-indigo-600 hover:text-indigo-700">
             Forgot password?
           </Link>
         </p>
 
-        {error && (
-          <p className="text-red-600 text-sm mb-3" role="alert">
-            {error}
-          </p>
-        )}
+        <FieldError>{error}</FieldError>
 
-        <button
-          type="submit"
-          disabled={loading}
-          className="w-full bg-blue-500 text-white py-2 rounded hover:bg-blue-600 disabled:opacity-60"
-        >
-          {loading ? "Signing in…" : "Login"}
-        </button>
-
-        <p className="mt-4 text-center text-sm text-gray-600">
-          No account?{" "}
-          <Link to="/signup" className="text-blue-600 hover:underline">
-            Sign up
-          </Link>
-        </p>
+        <Button type="submit" className="w-full" size="lg" loading={loading} disabled={loading}>
+          Sign in
+        </Button>
       </form>
-    </div>
+    </AuthLayout>
   );
 }
 

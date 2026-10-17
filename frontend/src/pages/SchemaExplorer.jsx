@@ -106,7 +106,7 @@ function SchemaExplorer() {
   }, [relationships, selectedTable]);
 
   return (
-    <AppShell title="Schema Explorer">
+    <AppShell>
       <div className="max-w-7xl mx-auto px-4 py-6 md:py-10 md:px-8">
         <div className="mb-6 md:mb-8 rounded-2xl border border-indigo-200/80 bg-gradient-to-r from-indigo-50 via-white to-sky-50 p-5 md:p-6 shadow-sm shadow-indigo-100/60">
           <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
