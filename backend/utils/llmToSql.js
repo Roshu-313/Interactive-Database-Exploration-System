@@ -22,7 +22,7 @@ User Query:
     const response = await axios.post(
       "https://api.groq.com/openai/v1/chat/completions",
       {
-        model: "llama-3.3-70b-versatile",
+        model: "openai/gpt-oss-20b",
         messages: [
           { role: "system", content: "You generate safe SQL queries." },
           { role: "user", content: prompt }

@@ -255,18 +255,18 @@ export function ResultsVisualizer({ results, resultMeta }) {
 
   const summaryChips = (
     <div className="flex flex-wrap gap-2 text-xs">
-      <span className="inline-flex items-center rounded-full bg-slate-100 px-3 py-1 font-medium text-slate-700">
+      <span className="inline-flex items-center rounded-md border border-slate-200 bg-slate-50 px-2 py-0.5 font-medium text-slate-700">
         {rows.length.toLocaleString()} rows
       </span>
-      <span className="inline-flex items-center rounded-full bg-emerald-50 px-3 py-1 font-medium text-emerald-800">
+      <span className="inline-flex items-center rounded-md border border-emerald-100 bg-emerald-50 px-2 py-0.5 font-medium text-emerald-800">
         {columns.length} columns
       </span>
       {numericColumns.length ? (
-        <span className="inline-flex items-center rounded-full bg-indigo-50 px-3 py-1 font-medium text-indigo-800">
+        <span className="inline-flex items-center rounded-md border border-indigo-100 bg-indigo-50 px-2 py-0.5 font-medium text-indigo-800">
           {numericColumns.length} numeric fields detected
         </span>
       ) : (
-        <span className="inline-flex items-center rounded-full bg-amber-50 px-3 py-1 font-medium text-amber-900">
+        <span className="inline-flex items-center rounded-md border border-amber-100 bg-amber-50 px-2 py-0.5 font-medium text-amber-900">
           No numeric fields detected
         </span>
       )}
@@ -274,22 +274,15 @@ export function ResultsVisualizer({ results, resultMeta }) {
   );
 
   return (
-    <section className="rounded-2xl border border-slate-200/90 bg-gradient-to-br from-white via-slate-50/40 to-white shadow-lg shadow-slate-200/50 overflow-hidden">
-      <div className="border-b border-slate-100 bg-white/80 backdrop-blur px-5 py-4 md:px-6 md:py-5 flex flex-col gap-4">
-        <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
+    <section className="rounded-xl border border-slate-200/90 bg-white shadow-[var(--shadow-card)] overflow-hidden">
+      <div className="border-b border-slate-100 px-4 py-3 md:px-5 md:py-4 flex flex-col gap-3">
+        <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-3">
           <div className="space-y-2 min-w-0">
-            <div className="flex items-center gap-2 flex-wrap">
-              <h3 className="text-sm font-semibold text-slate-900 tracking-tight">
-                Results explorer
-              </h3>
-              <span className="text-[11px] uppercase tracking-wide text-slate-400 font-semibold">
-                Visualizer
-              </span>
-            </div>
+            <h2 className="text-sm font-semibold text-slate-900 tracking-tight">
+              Query results
+            </h2>
             <p className="text-xs text-slate-600 leading-relaxed max-w-2xl">
-              Inspect rows in a structured grid, filter quickly, and flip to
-              charts when numeric columns are present — useful for spotting
-              trends and distributions.
+              Browse rows, filter, and switch to charts when numeric columns are available.
             </p>
             {summaryChips}
             {serverNotes ? (
@@ -316,9 +309,9 @@ export function ResultsVisualizer({ results, resultMeta }) {
                 role="tab"
                 aria-selected={view === t.id}
                 onClick={() => setView(t.id)}
-                className={`px-3 py-2 rounded-xl text-xs font-semibold transition-all border shadow-sm ${
+                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors border ${
                   view === t.id
-                    ? "bg-slate-900 text-white border-slate-900 shadow-slate-300/40"
+                    ? "bg-indigo-600 text-white border-indigo-600"
                     : "bg-white text-slate-700 border-slate-200 hover:border-slate-300 hover:bg-slate-50"
                 }`}
               >

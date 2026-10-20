@@ -1,10 +1,22 @@
 import { cn } from "../ui/cn";
 
-export function IdesLogo({ className, showWordmark = true, compact = false }) {
+export function IdesLogo({
+  className,
+  showWordmark = true,
+  compact = false,
+  theme = "light",
+  subtitle,
+}) {
+  const isDark = theme === "dark";
+  const defaultSubtitle = isDark ? null : "Database exploration";
+
   return (
     <div className={cn("flex items-center gap-2.5 min-w-0", className)}>
       <div
-        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-indigo-600 text-white shadow-sm shadow-indigo-600/25"
+        className={cn(
+          "flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-white shadow-sm",
+          isDark ? "bg-indigo-600 shadow-indigo-900/40" : "bg-indigo-600 shadow-indigo-600/25",
+        )}
         aria-hidden
       >
         <svg viewBox="0 0 24 24" fill="none" className="h-5 w-5" stroke="currentColor" strokeWidth="1.75">
@@ -15,12 +27,23 @@ export function IdesLogo({ className, showWordmark = true, compact = false }) {
       </div>
       {showWordmark ? (
         <div className="min-w-0 leading-tight">
-          <p className={cn("font-semibold tracking-tight text-slate-900", compact ? "text-sm" : "text-base")}>
+          <p
+            className={cn(
+              "font-semibold tracking-tight",
+              compact ? "text-sm" : "text-base",
+              isDark ? "text-white" : "text-slate-900",
+            )}
+          >
             IDES
           </p>
-          {!compact ? (
-            <p className="text-[11px] text-slate-500 truncate hidden sm:block">
-              Database exploration
+          {(subtitle ?? defaultSubtitle) && !compact ? (
+            <p
+              className={cn(
+                "text-[11px] truncate",
+                isDark ? "text-slate-400" : "text-slate-500 hidden sm:block",
+              )}
+            >
+              {subtitle ?? defaultSubtitle}
             </p>
           ) : null}
         </div>

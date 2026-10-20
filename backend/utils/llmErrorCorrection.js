@@ -2,7 +2,7 @@ const axios = require('axios');
 const { validateSqlSecuritySync } = require('./sqlSecurity');
 
 const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions';
-const MODEL = 'llama-3.3-70b-versatile';
+const MODEL = 'openai/gpt-oss-20b';
 
 function defaultAssistance(category, safeMessage) {
   const titles = {
