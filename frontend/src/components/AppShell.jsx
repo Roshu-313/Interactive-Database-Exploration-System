@@ -50,6 +50,29 @@ const adminNavItem = {
   ),
 };
 
+const adminSubNavItems = [
+  {
+    to: "/admin/statistics",
+    label: "System Statistics",
+    end: true,
+  },
+  {
+    to: "/admin/users",
+    label: "Users",
+    end: true,
+  },
+  {
+    to: "/admin/activity",
+    label: "Query Activity",
+    end: true,
+  },
+  {
+    to: "/admin/feedback",
+    label: "Feedback",
+    end: true,
+  },
+];
+
 function SidebarNavItem({ to, label, icon, end, onNavigate }) {
   return (
     <NavLink
@@ -115,15 +138,34 @@ export function AppShell({ children }) {
   const displayName = user?.name || user?.email || "Account";
   const isAdmin = user?.role === "admin";
   const initials = (displayName[0] || "?").slice(0, 1).toUpperCase();
-
   const navLinks = (
     <>
       {navItems.map((item) => (
-        <SidebarNavItem key={item.to} {...item} onNavigate={closeMobile} />
+        <SidebarNavItem
+          key={item.to}
+          {...item}
+          onNavigate={closeMobile}
+        />
       ))}
-      {isAdmin ? (
-        <SidebarNavItem {...adminNavItem} onNavigate={closeMobile} />
-      ) : null}
+  
+      {isAdmin && (
+        <div className="pt-3">
+          <div className="flex items-center gap-3 px-3 py-2 text-xs font-semibold uppercase tracking-wider text-slate-500">
+            {adminNavItem.icon}
+            <span>Admin</span>
+          </div>
+  
+          <div className="ml-4 mt-1 space-y-0.5 border-l border-slate-700 pl-2">
+            {adminSubNavItems.map((item) => (
+              <SidebarNavItem
+                key={item.to}
+                {...item}
+                onNavigate={closeMobile}
+              />
+            ))}
+          </div>
+        </div>
+      )}
     </>
   );
 

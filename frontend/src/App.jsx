@@ -1,3 +1,4 @@
+
 import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
 
 import { AuthProvider } from "./context/AuthContext";
@@ -17,12 +18,14 @@ function App() {
     <AuthProvider>
       <Router>
         <Routes>
+          {/* Public routes */}
           <Route path="/login" element={<Login />} />
           <Route path="/signup" element={<Signup />} />
           <Route path="/forgot-password" element={<ForgotPassword />} />
           <Route path="/reset-password/:token" element={<ResetPassword />} />
           <Route path="/" element={<Navigate to="/login" replace />} />
 
+          {/* User routes */}
           <Route
             path="/query"
             element={
@@ -31,6 +34,7 @@ function App() {
               </ProtectedRoute>
             }
           />
+
           <Route
             path="/schema"
             element={
@@ -39,6 +43,7 @@ function App() {
               </ProtectedRoute>
             }
           />
+
           <Route
             path="/profile"
             element={
@@ -47,15 +52,54 @@ function App() {
               </ProtectedRoute>
             }
           />
+
+          {/* Admin routes */}
           <Route
             path="/admin"
             element={
               <ProtectedRoute requireAdmin>
-                <Admin />
+                <Navigate to="/admin/statistics" replace />
               </ProtectedRoute>
             }
           />
 
+          <Route
+            path="/admin/statistics"
+            element={
+              <ProtectedRoute requireAdmin>
+                <Admin section="statistics" />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/admin/users"
+            element={
+              <ProtectedRoute requireAdmin>
+                <Admin section="users" />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/admin/activity"
+            element={
+              <ProtectedRoute requireAdmin>
+                <Admin section="activity" />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/admin/feedback"
+            element={
+              <ProtectedRoute requireAdmin>
+                <Admin section="feedback" />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Fallback */}
           <Route path="*" element={<Navigate to="/login" replace />} />
         </Routes>
       </Router>

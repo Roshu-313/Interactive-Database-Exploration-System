@@ -14,6 +14,13 @@ import {
   Pie,
   Cell,
 } from "recharts";
+import { inferColumns, inferNumericColumns } from "../analytics/columnTyping.js";
+import { aggregateXY, lineSeries } from "../analytics/chartData.js";
+import { compareValues, formatCell } from "../analytics/formatters.js";
+import {
+  StatisticsPanel,
+  computeResultAnalysis,
+} from "./results/StatisticsPanel.jsx";
 
 const PAGE_SIZES = [10, 25, 50, 100];
 const CHART_COLORS = [
@@ -28,117 +35,6 @@ const CHART_COLORS = [
   "#0d9488",
   "#be123c",
 ];
-
-function looksNumeric(value) {
-  if (value === null || value === undefined || value === "") return null;
-  if (typeof value === "number") return Number.isFinite(value);
-  if (typeof value === "boolean") return true;
-  if (typeof value === "string") {
-    const t = value.trim();
-    if (t === "") return null;
-    return /^-?\d+(\.\d+)?([eE][+-]?\d+)?$/.test(t);
-  }
-  return false;
-}
-
-function coerceNumber(value) {
-  if (value === null || value === undefined || value === "") return null;
-  if (typeof value === "number") return Number.isFinite(value) ? value : null;
-  if (typeof value === "boolean") return value ? 1 : 0;
-  if (typeof value === "string") {
-    const n = Number(value.trim());
-    return Number.isFinite(n) ? n : null;
-  }
-  return null;
-}
-
-function inferColumns(rows) {
-  if (!Array.isArray(rows) || rows.length === 0) return [];
-  const set = new Set();
-  const cap = Math.min(rows.length, 80);
-  for (let i = 0; i < cap; i++) {
-    const row = rows[i];
-    if (row && typeof row === "object" && !Array.isArray(row)) {
-      Object.keys(row).forEach((k) => set.add(k));
-    }
-  }
-  return Array.from(set);
-}
-
-function inferNumericColumns(rows, columns) {
-  const sample = rows.slice(0, 400);
-  return columns.filter((col) => {
-    let ok = 0;
-    let total = 0;
-    for (const row of sample) {
-      const v = row?.[col];
-      if (v === null || v === undefined || v === "") continue;
-      total += 1;
-      const ln = looksNumeric(v);
-      if (ln === true) ok += 1;
-    }
-    if (total === 0) return false;
-    return ok / total >= 0.85;
-  });
-}
-
-function formatCell(value) {
-  if (value === null || value === undefined) return "";
-  if (typeof value === "object") return JSON.stringify(value);
-  return String(value);
-}
-
-function aggregateXY(rows, xKey, yKey, limit = 24) {
-  const map = new Map();
-  for (const row of rows) {
-    const yv = coerceNumber(row?.[yKey]);
-    if (yv === null || !Number.isFinite(yv)) continue;
-    const xv = row?.[xKey];
-    const label =
-      xv === null || xv === undefined || xv === "" ? "—" : String(xv);
-    map.set(label, (map.get(label) ?? 0) + yv);
-  }
-  const sorted = Array.from(map.entries()).sort((a, b) => b[1] - a[1]);
-  const top = sorted.slice(0, limit);
-  const rest = sorted.slice(limit);
-  const restSum = rest.reduce((acc, [, v]) => acc + v, 0);
-  const data = top.map(([name, value]) => ({ name, value }));
-  if (restSum !== 0) data.push({ name: `Other (${rest.length} …)`, value: restSum });
-  return data;
-}
-
-function lineSeries(rows, xKey, yKey, maxPoints = 180) {
-  const out = [];
-  let skipped = 0;
-  for (let i = 0; i < rows.length; i++) {
-    const row = rows[i];
-    const yv = coerceNumber(row?.[yKey]);
-    if (yv === null || !Number.isFinite(yv)) {
-      skipped += 1;
-      continue;
-    }
-    const xv = row?.[xKey];
-    const name =
-      xv !== null && xv !== undefined && xv !== ""
-        ? String(xv)
-        : `Row ${i + 1}`;
-    out.push({ name, value: yv, __i: i });
-    if (out.length >= maxPoints) break;
-  }
-  return { data: out, skipped, truncated: rows.length > out.length };
-}
-
-function compareValues(a, b, col) {
-  const va = a?.[col];
-  const vb = b?.[col];
-  const na = coerceNumber(va);
-  const nb = coerceNumber(vb);
-  if (na !== null && nb !== null && na !== nb) return na - nb;
-  return formatCell(va).localeCompare(formatCell(vb), undefined, {
-    numeric: true,
-    sensitivity: "base",
-  });
-}
 
 /**
  * Rich query results: sortable table, filter, pagination, and Recharts views.
@@ -159,6 +55,21 @@ export function ResultsVisualizer({ results, resultMeta }) {
     if (resultMeta?.numericColumns?.length) return resultMeta.numericColumns;
     return inferNumericColumns(rows, columns);
   }, [resultMeta, rows, columns]);
+
+  const analysis = useMemo(() => {
+    try {
+      return {
+        ...computeResultAnalysis(rows, columns),
+        error: null,
+      };
+    } catch (err) {
+      return {
+        statistics: null,
+        outliers: null,
+        error: err,
+      };
+    }
+  }, [rows, columns]);
 
   const serverNotes = resultMeta?.visualization?.notes;
 
@@ -275,6 +186,16 @@ export function ResultsVisualizer({ results, resultMeta }) {
 
   return (
     <section className="rounded-xl border border-slate-200/90 bg-white shadow-[var(--shadow-card)] overflow-hidden">
+      <div className="p-4 md:p-6 border-b border-slate-100 bg-white">
+        <div className="rounded-xl border border-slate-200 bg-slate-50/40 p-4 md:p-5">
+          <StatisticsPanel
+            statistics={analysis.statistics}
+            outliers={analysis.outliers}
+            error={analysis.error}
+          />
+        </div>
+      </div>
+
       <div className="border-b border-slate-100 px-4 py-3 md:px-5 md:py-4 flex flex-col gap-3">
         <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-3">
           <div className="space-y-2 min-w-0">
@@ -321,73 +242,38 @@ export function ResultsVisualizer({ results, resultMeta }) {
           </div>
         </div>
 
-        {view !== "table" ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            <label className="flex flex-col gap-1 text-xs font-medium text-slate-600">
-              X axis / labels
-              <select
-                value={resolvedX}
-                onChange={(e) => setXAxis(e.target.value)}
-                className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 shadow-inner shadow-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500/25 focus:border-blue-500"
-              >
-                <option value="">Select column…</option>
-                {columns.map((c) => (
-                  <option key={c} value={c}>
-                    {c}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="flex flex-col gap-1 text-xs font-medium text-slate-600">
-              Y axis / values
-              <select
-                value={resolvedY}
-                onChange={(e) => setYAxis(e.target.value)}
-                className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 shadow-inner shadow-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500/25 focus:border-blue-500"
-              >
-                <option value="">Select numeric column…</option>
-                {numericColumns.map((c) => (
-                  <option key={c} value={c}>
-                    {c}
-                  </option>
-                ))}
-              </select>
-            </label>
-          </div>
-        ) : (
-          <div className="flex flex-col sm:flex-row gap-3 sm:items-end">
-            <label className="flex-1 flex flex-col gap-1 text-xs font-medium text-slate-600">
-              Search within results
-              <input
-                type="search"
-                value={filterText}
-                onChange={(e) => {
-                  setFilterText(e.target.value);
-                  setPage(1);
-                }}
-                placeholder="Filter across all columns…"
-                className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 shadow-inner shadow-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500/25 focus:border-blue-500"
-              />
-            </label>
-            <label className="flex flex-col gap-1 text-xs font-medium text-slate-600 w-full sm:w-40">
-              Page size
-              <select
-                value={pageSize}
-                onChange={(e) => {
-                  setPageSize(Number(e.target.value));
-                  setPage(1);
-                }}
-                className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 shadow-inner shadow-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500/25 focus:border-blue-500"
-              >
-                {PAGE_SIZES.map((n) => (
-                  <option key={n} value={n}>
-                    {n} rows
-                  </option>
-                ))}
-              </select>
-            </label>
-          </div>
-        )}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <label className="flex flex-col gap-1 text-xs font-medium text-slate-600">
+            X axis / labels
+            <select
+              value={resolvedX}
+              onChange={(e) => setXAxis(e.target.value)}
+              className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 shadow-inner shadow-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500/25 focus:border-blue-500"
+            >
+              <option value="">Select column…</option>
+              {columns.map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="flex flex-col gap-1 text-xs font-medium text-slate-600">
+            Y axis / values
+            <select
+              value={resolvedY}
+              onChange={(e) => setYAxis(e.target.value)}
+              className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 shadow-inner shadow-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500/25 focus:border-blue-500"
+            >
+              <option value="">Select numeric column…</option>
+              {numericColumns.map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
       </div>
 
       <div className="p-4 md:p-6 bg-white">
