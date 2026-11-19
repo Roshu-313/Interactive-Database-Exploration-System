@@ -10,6 +10,7 @@ import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
 import Query from "./pages/Query";
 import SchemaExplorer from "./pages/SchemaExplorer";
+import SqlLearningGuide from "./pages/SqlLearningGuide";
 import Profile from "./pages/Profile";
 import Admin from "./pages/Admin";
 
@@ -40,6 +41,15 @@ function App() {
             element={
               <ProtectedRoute>
                 <SchemaExplorer />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/learn"
+            element={
+              <ProtectedRoute>
+                <SqlLearningGuide />
               </ProtectedRoute>
             }
           />
